@@ -9,12 +9,60 @@
 import UIKit
 
 class ViewController: UIViewController {
-
+    
+    weak var dockingView: DockingView?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
+        let button = UIButton(frame: CGRect(x: 100, y: 100, width: 100, height: 50))
+        button.backgroundColor = .red
+        button.setTitle("Present", for: .normal)
+        button.addTarget(self, action: #selector(clickedOnButton), for: .touchUpInside)
+        self.view.addSubview(button)
     }
+    
+    @objc func clickedOnButton() {
+        dockingView = DockingViewSubClass(referenceView: self.view)
+        dockingView?.present()
+    }
+}
 
 
+
+class DockingViewSubClass: DockingView {
+    
+    //Please go in the Docking view Class to get whole lot of overridable methods for each instance
+    override func viewAppeared(fromState: DockingViewState, toState: DockingViewState) {
+        addViewToTopView()
+        addViewToCentralView()
+    }
+    
+    override func viewGoingToDisAppear(viewState: DockingViewState) {
+        
+    }
+    
+    override func viewIsGoingToAppear(fromState: DockingViewState, toState: DockingViewState) {
+        
+    }
+    override func viewWillStartTransition(currentState: DockingViewState, toState: DockingViewState) {
+        
+    }
+    
+    override func dockingViewRatioChangeInTransition(_ scale: CGFloat) {
+        
+    }
+    
+    func addViewToTopView() {
+        let view = UIView(frame: self.topView.bounds)
+        view.addAsSubViewWithConstraints(self.topView)
+        view.backgroundColor = .gray
+    }
+    
+    func addViewToCentralView() {
+        let view = UIView(frame: self.centralView.bounds)
+        view.addAsSubViewWithConstraints(self.centralView)
+        view.backgroundColor = .orange
+    }
 }
 
