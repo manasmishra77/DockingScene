@@ -10,7 +10,7 @@ import UIKit
 
 class ViewController: UIViewController {
     
-    weak var dockingView: DockingView?
+    weak var dockingView: DockingViewSubClass?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -24,6 +24,8 @@ class ViewController: UIViewController {
     
     @objc func clickedOnButton() {
         dockingView = DockingViewSubClass(referenceView: self.view)
+        dockingView?.addViewToTopView()
+        dockingView?.addViewToCentralView()
         dockingView?.present()
     }
 }
@@ -34,8 +36,6 @@ class DockingViewSubClass: DockingView {
     
     //Please go in the Docking view Class to get whole lot of overridable methods for each instance
     override func viewAppeared(fromState: DockingViewState, toState: DockingViewState) {
-        addViewToTopView()
-        addViewToCentralView()
     }
     
     override func viewGoingToDisAppear(viewState: DockingViewState) {
@@ -48,7 +48,6 @@ class DockingViewSubClass: DockingView {
     override func viewWillStartTransition(currentState: DockingViewState, toState: DockingViewState) {
         
     }
-    
     override func dockingViewRatioChangeInTransition(_ scale: CGFloat) {
         
     }

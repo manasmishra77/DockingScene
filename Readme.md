@@ -4,7 +4,7 @@ About the Docking View:
 - When you will dock it in the leftside corner, the Centralview gradually gets hidden and Topview will cover the whole the view
 - To dismiss the view user has to right swipe or left swipe on the docking view when it is in docked state
 
-
+- To disable docking: Make the boolean false: dockingIsAllowed = false
 
 - To use the docking view one has to subclass it, initalize the subclass with superclass's convenience init method and call the instanc's present method
 - Sub class can modify the dockingview size, panlength etc. All overridable mehtods are written initial of the DockingView file
