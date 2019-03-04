@@ -15,9 +15,8 @@ enum DockingViewState {
     case transitionUpWard
     case transitionDownWard
     case transitionLeftSide
+    case transitionRightSide
 }
-
-
 
 class DockingView: UIView {
     
@@ -57,6 +56,7 @@ class DockingView: UIView {
         static let width = UIScreen.main.bounds.width
         static let thresholdSpeed: Double = 150
         static let cornerRadiusForDockedsize: CGFloat = 3
+        static let minimumSlopeToStartDismiss: CGFloat = 0.2
     }
     
     enum AnimationTime: Double {
@@ -381,7 +381,6 @@ extension DockingView {
 
 //Touch Transition related Helper functions
 private extension DockingView {
-    
     //Getting MultiplierConstraints
     func setMultiPlierConstraintsForView(_ view: UIView, multiplier: CGFloat) {
         if let existingConstraint = self.widthToHeightRatioConstraint {
@@ -442,6 +441,18 @@ private extension DockingView {
 
             default:
                 if dockingViewState == .docked {
+                    //To handle the left dide and rightside swipe dismiss case
+                    if let touchStartingPoint = touchStartingPoint {
+                        let deltaY = touchStartingPoint.y - touchingPoint.y
+                        let deltaX = touchStartingPoint.x - touchingPoint.x
+                        let slope = deltaY/deltaX
+                        if slope < DeviceSpecific.minimumSlopeToStartDismiss {
+                            dockingViewState = .transitionLeftSide
+                        } else if slope > DeviceSpecific.minimumSlopeToStartDismiss {
+                            dockingViewState = .transitionRightSide
+                        }
+                    }
+                    //To handle the upward panning case
                     if (touchStartingPoint?.y ?? 0) - touchingPoint.y > minimumPanLengthToStartPanning {
                         if !isTransitionPannigStarted {
                             isTransitionPannigStarted = true
