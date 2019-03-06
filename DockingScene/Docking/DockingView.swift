@@ -56,7 +56,6 @@ class DockingView: UIView {
         static let width = UIScreen.main.bounds.width
         static let thresholdSpeed: Double = 150
         static let cornerRadiusForDockedsize: CGFloat = 3
-        static let minimumSlopeToStartDismiss: CGFloat = 0.2
     }
     
     enum AnimationTime: Double {
@@ -154,14 +153,18 @@ class DockingView: UIView {
     
     //Used as panlength to dismis while swipping left in docked state
     var panLengthForLeftSwipeDismiss: CGFloat {
-        return dockedStateOrigin.x
         if let initialPoint = touchStartingPoint {
-            return initialPoint.x - 50
+            return initialPoint.x
         }
         return DeviceSpecific.width - 100
     }
-    var minimumPanLengthToStartPanningToDismiss: CGFloat {
-        return 0.1*panLengthForLeftSwipeDismiss
+    
+    //Used as panlength to dismis while swipping left in docked state
+    var panLengthForRightSwipeDismiss: CGFloat {
+        if let initialPoint = touchStartingPoint {
+            return DeviceSpecific.width - initialPoint.x
+        }
+        return DeviceSpecific.width - 100
     }
     
     
@@ -227,6 +230,9 @@ class DockingView: UIView {
     
     // Called when docking view is in transition and scale is minimum(0) at docking state and maximum(1) at expanded state, Varries between 0 to 1
     func dockingViewRatioChangeInTransition(_ scale: CGFloat) {}
+    
+    // Called when docking view is in transition state from docking to dismiss state only and scale is minimum(0) at dismiss state and maximum(1) at docked state, Varries between 0 to 1
+    func dockingViewRatioChangeInTransitionDuringDismiss(_ scale: CGFloat) {}
 }
 
 // Methods For only this class and non-overidable by sub classes
@@ -511,7 +517,7 @@ private extension DockingView {
             isTransitionPannigStarted = false
             let endFrame = getFrameOfTheDockingView(touchingPoint: touchingPoint, viewState: self.dockingViewState)
             var newFrame = endFrame
-            if dockingViewState == .transitionLeftSide {
+            if dockingViewState == .transitionLeftSide  || dockingViewState == .transitionRightSide {
                 newFrame = gettingFinalFrameInTouchEndForLeftSwipeToDismiss(endFrame, viewState: self.dockingViewState, endPoint: touchingPoint)
             } else {
                 newFrame =  gettingFinalFrameForTouchEnd(endFrame, viewState: self.dockingViewState, endPoint: touchingPoint)
@@ -639,8 +645,8 @@ private extension DockingView {
         swipeRightGesture.direction = .right
         //self.addGestureRecognizer(swipeLeftGesture)
         //self.addGestureRecognizer(swipeRightGesture)
-        self.swipeLeftGesture = swipeLeftGesture
-        self.swipeRightGesture = swipeRightGesture
+        //self.swipeLeftGesture = swipeLeftGesture
+        //self.swipeRightGesture = swipeRightGesture
 
     }
     @objc func handleSwipeGesture(swipeGesture: UISwipeGestureRecognizer) {
@@ -682,31 +688,35 @@ private extension DockingView {
     func getFrameOfDockingViewForLeftSwipeDismiss(touchingPoint: CGPoint, viewState: DockingViewState) -> CGRect {
         if viewState == .transitionLeftSide {
             let dC = (touchStartingPoint?.x ?? 0) - touchingPoint.x
-            var scale = (panLengthForLeftSwipeDismiss-dC)/panLengthForLeftSwipeDismiss
+            var scale = dC/panLengthForLeftSwipeDismiss
             if scale < 0 {
                 scale = 0
             } else if scale > 1 {
                 scale = 1
             }
-            let currentX = (dockedStateOrigin.x + dockedStatesize.width)*scale
+            let currentX = -dockedStatesize.width + ((1-scale)*dockedStateFrame.maxX)
             var newFrame = dockedStateFrame
             if currentX < newFrame.origin.x {
                 newFrame.origin.x = currentX
             }
-            self.containerView?.alpha = scale
+            self.containerView?.alpha = 1-scale
+            self.dockingViewRatioChangeInTransitionDuringDismiss(scale)
             return newFrame
         } else if viewState == .transitionRightSide {
             let dC = touchingPoint.x - (touchStartingPoint?.x ?? 0)
-            var scale = (DeviceSpecific.width - dockedStateOrigin.x) //(panLengthForLeftSwipeDismiss-dC)/panLengthForLeftSwipeDismiss
+            var scale = dC/panLengthForRightSwipeDismiss
             if scale < 0 {
                 scale = 0
             } else if scale > 1 {
                 scale = 1
             }
-            let currentX = (dockedStateOrigin.x + dockedStatesize.width)*scale
+            let currentX = dockedStateOrigin.x + (DeviceSpecific.width - dockedStateOrigin.x)*scale
             var newFrame = dockedStateFrame
-            newFrame.origin.x = currentX
-            self.containerView?.alpha = scale
+            if currentX > newFrame.origin.x {
+                newFrame.origin.x = currentX
+            }
+            self.containerView?.alpha = 1-scale
+            self.dockingViewRatioChangeInTransitionDuringDismiss(scale)
             return newFrame
         }
         return CGRect.zero
@@ -714,15 +724,41 @@ private extension DockingView {
     }
     
     func gettingFinalFrameInTouchEndForLeftSwipeToDismiss(_ endFrame: CGRect, viewState: DockingViewState, endPoint: CGPoint) -> CGRect {
-        if endPoint.x > (panLengthForLeftSwipeDismiss/2) {
-            self.dockingViewState = .docked
-            return dockedStateFrame
-        } else {
-            self.dockingViewState = .dismissed
-            var newFrame = dockedStateFrame
-            newFrame.origin.x = -dockedStatesize.width
-            return newFrame
+        if viewState == .transitionLeftSide {
+            let dC = (touchStartingPoint?.x ?? 0) - endPoint.x
+            if getSpeedOfPanning(distanceCovered: dC) > DeviceSpecific.thresholdSpeed {
+                self.dockingViewState = .dismissed
+                var newFrame = dockedStateFrame
+                newFrame.origin.x = -dockedStatesize.width
+                self.dockingViewRatioChangeInTransitionDuringDismiss(0)
+                return newFrame
+            } else {
+                if endPoint.x > (panLengthForLeftSwipeDismiss/2) {
+                    self.dockingViewState = .docked
+                    self.dockingViewRatioChangeInTransitionDuringDismiss(1)
+                    return dockedStateFrame
+                } else {
+                    self.dockingViewState = .dismissed
+                    var newFrame = dockedStateFrame
+                    newFrame.origin.x = -dockedStatesize.width
+                    self.dockingViewRatioChangeInTransitionDuringDismiss(0)
+                    return newFrame
+                }
+            }
+        } else if viewState == .transitionRightSide {
+            if endPoint.x < (dockedStateOrigin.x + (DeviceSpecific.width - dockedStateOrigin.x)*0.5) {
+                self.dockingViewState = .docked
+                self.dockingViewRatioChangeInTransitionDuringDismiss(1)
+                return dockedStateFrame
+            } else {
+                self.dockingViewState = .dismissed
+                var newFrame = dockedStateFrame
+                newFrame.origin.x = DeviceSpecific.width
+                self.dockingViewRatioChangeInTransitionDuringDismiss(0)
+                return newFrame
+            }
         }
+        return CGRect.zero
     }
 
 }
