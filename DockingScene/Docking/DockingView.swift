@@ -511,14 +511,16 @@ private extension DockingView {
             guard touchStartingPoint != nil else {return nil}
             guard isTransitionPannigStarted else {return nil}
             isTransitionPannigStarted = false
-            let endFrame = getFrameOfTheDockingView(touchingPoint: touchingPoint, viewState: self.dockingViewState)
-            var newFrame = endFrame
+            var newFrame = CGRect.zero
             if dockingViewState == .transitionLeftSide  || dockingViewState == .transitionRightSide {
+                let endFrame = getFrameOfDockingViewForLeftSwipeDismiss(touchingPoint: touchingPoint, viewState: dockingViewState)
+                newFrame = endFrame
                 newFrame = gettingFinalFrameInTouchEndForLeftSwipeToDismiss(endFrame, viewState: self.dockingViewState, endPoint: touchingPoint)
             } else {
+                let endFrame = getFrameOfTheDockingView(touchingPoint: touchingPoint, viewState: self.dockingViewState)
+                newFrame = endFrame
                 newFrame =  gettingFinalFrameForTouchEnd(endFrame, viewState: self.dockingViewState, endPoint: touchingPoint)
             }
-
             touchStartingPoint = nil
             touchStartingTime = nil
             return newFrame
