@@ -372,15 +372,21 @@ extension DockingView {
                 if previousState != self.dockingViewState {
                     self.viewStateWillChangeTo(fromState: previousState, toState: self.dockingViewState)
                 }
-                if previousState == .transitionLeftSide {
+                if previousState == .transitionLeftSide || previousState == .transitionRightSide {
                     let containerViewAlpha: CGFloat = (self.dockingViewState == .docked) ? 1 : 0
-                    UIView.animate(withDuration: 0.3, animations: {
+                    if self.dockingViewState == .dismissed {
+                        self.viewGoingToDisAppear(viewState: .dismissed)
+                    }
+                    UIView.animate(withDuration: 0.2, animations: {
                         containerView.alpha = containerViewAlpha
                         containerView.frame = newFrame
                         containerView.layoutIfNeeded()
                     }) { (_) in
                         if previousState != self.dockingViewState {
                             self.viewStateChanged(fromState: previousState, toState: self.dockingViewState)
+                        }
+                        if self.dockingViewState == .dismissed {
+                            self.viewDisAppeared(viewState: .dismissed)
                         }
                     }
                 } else {
@@ -468,17 +474,7 @@ private extension DockingView {
                             dockingViewState = .transitionUpWard
                             self.viewWillStartTransition(currentState: currentState, toState: dockingViewState)
                         }
-                    }
-//                    else if let touchStartingPoint = touchStartingPoint, touchingPoint.y > dockedStateOrigin.y, touchingPoint.x < dockedStateOrigin.x {
-//                        //Handle the case when left side dismiis is to work
-//                        if !isTransitionPannigStarted {
-//                            isTransitionPannigStarted = true
-//                            let currentState = dockingViewState
-//                            dockingViewState = .transitionLeftSide
-//                            self.viewWillStartTransition(currentState: currentState, toState: dockingViewState)
-//                        }
-//                    }
-                    else if let touchStartingPoint = touchStartingPoint, touchingPoint.y > dockedStateOrigin.y {
+                    } else if let touchStartingPoint = touchStartingPoint, touchingPoint.y > dockedStateOrigin.y {
                         if (touchStartingPoint.x - touchingPoint.x) > 20 {
                             if !isTransitionPannigStarted {
                                 isTransitionPannigStarted = true
