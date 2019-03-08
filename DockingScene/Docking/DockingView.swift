@@ -686,6 +686,9 @@ private extension DockingView {
     func getFrameOfDockingViewForLeftSwipeDismiss(touchingPoint: CGPoint, viewState: DockingViewState) -> CGRect {
         if viewState == .transitionLeftSide {
             let dC = (touchStartingPoint?.x ?? 0) - touchingPoint.x
+            guard dC >= 0 else {
+                return getFrameOfDockingViewForLeftSwipeDismiss(touchingPoint: touchingPoint, viewState: .transitionRightSide)
+            }
             var scale = dC/panLengthForLeftSwipeDismiss
             if scale < 0 {
                 scale = 0
@@ -702,6 +705,9 @@ private extension DockingView {
             return newFrame
         } else if viewState == .transitionRightSide {
             let dC = touchingPoint.x - (touchStartingPoint?.x ?? 0)
+            guard dC >= 0 else {
+                return getFrameOfDockingViewForLeftSwipeDismiss(touchingPoint: touchingPoint, viewState: .transitionLeftSide)
+            }
             var scale = dC/panLengthForRightSwipeDismiss
             if scale < 0 {
                 scale = 0
