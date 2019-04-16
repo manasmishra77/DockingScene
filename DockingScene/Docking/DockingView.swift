@@ -19,6 +19,12 @@ enum DockingViewState {
 }
 
 class DockingView: UIView {
+    struct ConstraontsToDockingView {
+        var top: CGFloat
+        var bottom: CGFloat
+        var leading: CGFloat
+        var trailing: CGFloat
+    }
     
     private struct DeviceSpecific {
         static private var appDelegate: AppDelegate? {
@@ -104,12 +110,30 @@ class DockingView: UIView {
     private var swipeLeftGesture: UISwipeGestureRecognizer?
     private var swipeRightGesture: UISwipeGestureRecognizer?
     
+    //Four Constraints to the refernce view
+    weak var topConstraintsOfReferenceView: NSLayoutConstraint?
+    weak var bottomConstraintsOfReferenceView: NSLayoutConstraint?
+    weak var leadingConstraintsOfReferenceView: NSLayoutConstraint?
+    weak var trailingConstraintsOfReferenceView: NSLayoutConstraint?
     
-    convenience init(referenceView: UIView) {
+    convenience init(referenceView: UIView, initialConstraints: ConstraontsToDockingView) {
         let container = UIView()
         container.frame = referenceView.bounds
         referenceView.addSubview(container)
+        let constraintTuple = container.addFourConstraintsUsingNSLayoutConstraint(referenceView)
+        
         self.init(frame: container.bounds)
+        
+        self.topConstraintsOfReferenceView = constraintTuple.top
+        self.bottomConstraintsOfReferenceView = constraintTuple.bottom
+        self.leadingConstraintsOfReferenceView = constraintTuple.leading
+        self.trailingConstraintsOfReferenceView = constraintTuple.trailing
+        self.topConstraintsOfReferenceView?.constant = initialConstraints.top
+        self.bottomConstraintsOfReferenceView?.constant = initialConstraints.bottom
+        self.leadingConstraintsOfReferenceView?.constant = initialConstraints.leading
+        self.trailingConstraintsOfReferenceView?.constant = initialConstraints.trailing
+        
+        
         let newDView = self
         let topView = UIView(frame: newDView.bounds)
         newDView.topView = topView
@@ -122,7 +146,6 @@ class DockingView: UIView {
         centralView.topAnchor.constraint(equalTo: topView.bottomAnchor, constant: 0).isActive = true
         newDView.topViewRatio = 16/9
         newDView.addGestureRecognizer()
-        newDView.addSwipeGestureRecognizer()
         newDView.containerView = container
         newDView.referenceView = referenceView
         newDView.addAsSubViewWithConstraints(container)
@@ -237,6 +260,19 @@ class DockingView: UIView {
 
 // Methods For only this class and non-overidable by sub classes
 extension DockingView {
+    private var leadingConstraintAtDockedState: CGFloat {
+        return dockedStateOrigin.x
+    }
+    private var trailingConstraintAtDockedState: CGFloat {
+        return DeviceSpecific.width - dockedStateFrame.maxX
+    }
+    private var bottomConstraintAtDockedState: CGFloat {
+        return DeviceSpecific.height - dockedStateFrame.maxY
+    }
+    private var topConstraintAtDockedState: CGFloat {
+        return dockedStateOrigin.y
+    }
+    
     private var dockedStatesize: CGSize {
         let width = DeviceSpecific.width/dockedStateWidthWRTDeviceWidth
         let height = width/topViewRatio
@@ -260,8 +296,8 @@ extension DockingView {
     
     func present(animation: Bool = true) {
         guard let containerView = self.containerView else {return}
+        guard let refernceView = self.referenceView else {return}
         let animationTime = animation ? 0.5 : 0
-        let newFrame = expandedStateFrame
         let previousState = self.dockingViewState
         if previousState == .docked {
             self.viewStateWillChangeTo(fromState: previousState, toState: .expanded)
@@ -269,10 +305,10 @@ extension DockingView {
             self.viewIsGoingToAppear(fromState: previousState, toState: .expanded)
         }
         containerView.clipsToBounds = true
+        self.setContainerViewToState(.expanded)
         UIView.animate(withDuration: animationTime, animations: {
-            containerView.frame = newFrame
             containerView.isHidden = false
-            containerView.layoutIfNeeded()
+            refernceView.layoutIfNeeded()
         }) { (_) in
             self.dockingViewState = .expanded
             self.dockingViewRatioChangeInTransition(1)
@@ -286,16 +322,16 @@ extension DockingView {
     
     // Called when forcefully/programmatically state need to be changed,
     func changeStateTo(toState: DockingViewState, animationTime: AnimationTime, _ completion: ((_ isSuccess: Bool) -> ())?) {
-        guard let containerView = self.containerView else {
+        guard let containerView = self.containerView, let refernceView = self.referenceView else {
             completion?(false)
             return
         }
         if toState == .docked, self.dockingViewState == .expanded {
             self.viewStateWillChangeTo(fromState: self.dockingViewState, toState: toState)
             self.viewWillStartTransition(currentState: self.dockingViewState, toState: toState)
+            self.setContainerViewToState(.docked)
             UIView.animate(withDuration: animationTime.rawValue, animations: {
-                containerView.frame = self.dockedStateFrame
-                containerView.layoutIfNeeded()
+                refernceView.layoutIfNeeded()
             }) { (success) in
                 if success {
                     let previousState = self.dockingViewState
@@ -310,9 +346,9 @@ extension DockingView {
         } else if toState == .expanded, self.dockingViewState == .docked {
             self.viewStateWillChangeTo(fromState: self.dockingViewState, toState: toState)
             self.viewWillStartTransition(currentState: self.dockingViewState, toState: toState)
+            self.setContainerViewToState(.expanded)
             UIView.animate(withDuration: animationTime.rawValue, animations: {
-                containerView.frame = self.expandedStateFrame
-                containerView.layoutIfNeeded()
+                refernceView.layoutIfNeeded()
             }) { (success) in
                 if success {
                     let previousState = self.dockingViewState
@@ -356,15 +392,15 @@ extension DockingView {
             
             if let newFrame = self.viewIsTouched(touchingPoint: currentPoint, touchState: .transition) {
                 //self.frame = newFrame
-                containerView.frame = newFrame
-                containerView.layoutIfNeeded()
+                //containerView.frame = newFrame
+                //containerView.layoutIfNeeded()
             }
         }
     }
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard isDockingAllowed else {return}
         guard let containerView = self.containerView else {return}
-        //guard let refernceView = self.referenceView else {return}
+        guard let refernceView = self.referenceView else {return}
         if let touch = touches.first {
             let currentPoint = touch.location(in: referenceView)
             let previousState = self.dockingViewState
@@ -379,8 +415,8 @@ extension DockingView {
                     }
                     UIView.animate(withDuration: 0.2, animations: {
                         containerView.alpha = containerViewAlpha
-                        containerView.frame = newFrame
-                        containerView.layoutIfNeeded()
+                        //containerView.frame = newFrame
+                        //containerView.layoutIfNeeded()
                     }) { (_) in
                         if previousState != self.dockingViewState {
                             self.viewStateChanged(fromState: previousState, toState: self.dockingViewState)
@@ -390,9 +426,9 @@ extension DockingView {
                         }
                     }
                 } else {
+                    self.setContainerViewToState(self.dockingViewState)
                     UIView.animate(withDuration: 0.3, animations: {
-                        containerView.frame = newFrame
-                        containerView.layoutIfNeeded()
+                        refernceView.layoutIfNeeded()
                     }) { (_) in
                         if previousState != self.dockingViewState {
                             self.viewStateChanged(fromState: previousState, toState: self.dockingViewState)
@@ -440,11 +476,13 @@ private extension DockingView {
                 guard let containerView = self.containerView else {return nil}
                 let currentFrame = containerView.frame
                 if currentFrame.height < thresholdSize.height {
-                    containerView.frame = getFrameForState(.docked)
+                    //containerView.frame = getFrameForState(.docked)
+                    self.setContainerViewToState(.docked)
                     containerView.layoutIfNeeded()
                     self.viewStateChanged(fromState: .expanded, toState: .docked)
                 } else {
-                    containerView.frame = getFrameForState(.expanded)
+                    //containerView.frame = getFrameForState(.expanded)
+                    self.setContainerViewToState(.expanded)
                     containerView.layoutIfNeeded()
                     self.viewStateChanged(fromState: .docked, toState: .expanded)
                 }
@@ -456,6 +494,7 @@ private extension DockingView {
             case .transitionDownWard, .transitionUpWard:
                 if shouldConsiderTouchMove {
                     shouldConsiderTouchMove = false
+                    changeFrameOfTheDockingView(touchingPoint: touchingPoint, viewState: dockingViewState)
                     return getFrameOfTheDockingView(touchingPoint: touchingPoint, viewState: dockingViewState)
                 } else {
                     shouldConsiderTouchMove = true
@@ -564,6 +603,9 @@ private extension DockingView {
         let newFrame = state == .expanded ? expandedStateFrame : dockedStateFrame
         return newFrame
     }
+    
+    
+    
     private func getSpeedOfPanning(distanceCovered: CGFloat) -> Double {
         guard let initialTime = touchStartingTime else {return 0.0}
         let durationOfTouching: Double = -(initialTime.timeIntervalSinceNow)
@@ -609,10 +651,40 @@ private extension DockingView {
         return newFrame
     }
     
+    func changeFrameOfTheDockingView(touchingPoint: CGPoint, viewState: DockingViewState) {
+        var dC = touchingPoint.y - (touchStartingPoint?.y ?? 0)
+        dC = (dC>(panLength-1)) ? (panLength-1) : dC
+        dC = viewState == .transitionUpWard ? panLength+dC:dC
+        var scale = (panLength-dC)/panLength
+        if scale < 0 {
+            scale = 0
+        } else if scale > 1 {
+            scale = 1
+        }
+        setConstraintsToViewWithVerticalScale(scale)
+    }
+    
     func changesInSizeForBottomEffect(_ scale: CGFloat) -> CGSize {
         let heightForBottomToConsider = (DeviceSpecific.height - dockedStateOrigin.y - dockedStatesize.height)*(1-scale)
         let widthForBottomToConsider = (DeviceSpecific.width - dockedStateOrigin.x - dockedStatesize.width)*(1-scale)
         return CGSize(width: widthForBottomToConsider, height: heightForBottomToConsider)
+    }
+    
+    
+    func setContainerViewToState(_ state: DockingViewState) {
+        if state == .docked {
+            setConstraintsToViewWithVerticalScale(0)
+        } else if state == .expanded {
+            setConstraintsToViewWithVerticalScale(1)
+        }
+    }
+    
+    func setConstraintsToViewWithVerticalScale(_ scale: CGFloat) {
+        //Scale == 1 :- Expanded state, Scale == 0 :- Docked state
+        leadingConstraintsOfReferenceView?.constant = leadingConstraintAtDockedState*(1-scale)
+        trailingConstraintsOfReferenceView?.constant = -trailingConstraintAtDockedState*(1-scale)
+        topConstraintsOfReferenceView?.constant = topConstraintAtDockedState*(1-scale)
+        bottomConstraintsOfReferenceView?.constant = -bottomConstraintAtDockedState*(1-scale)
     }
 }
 
@@ -628,53 +700,6 @@ private extension DockingView {
         guard (tapGesture.view as? DockingView) != nil else {return}
         if dockingViewState == .docked {
             present()
-        }
-    }
-}
-
-//Swipe Gesture related methods
-private extension DockingView {
-    func addSwipeGestureRecognizer() {
-        let swipeLeftGesture = UISwipeGestureRecognizer(target: self, action: #selector(self.handleSwipeGesture(swipeGesture:)))
-        let swipeRightGesture = UISwipeGestureRecognizer(target: self, action: #selector(self.handleSwipeGesture(swipeGesture:)))
-        swipeLeftGesture.direction = .left
-        swipeRightGesture.direction = .right
-        //self.addGestureRecognizer(swipeLeftGesture)
-        //self.addGestureRecognizer(swipeRightGesture)
-        //self.swipeLeftGesture = swipeLeftGesture
-        //self.swipeRightGesture = swipeRightGesture
-
-    }
-    @objc func handleSwipeGesture(swipeGesture: UISwipeGestureRecognizer) {
-        //HandleTap
-        guard (swipeGesture.view as? DockingView) != nil else {return}
-        guard let containerView = self.containerView else {return}
-        if dockingViewState == .docked, swipeGesture.direction == .left {
-            var newFrame = containerView.frame
-            newFrame.origin.x = 0
-            self.viewGoingToDisAppear(viewState: .dismissed)
-            UIView.animate(withDuration: 0.5, animations: {
-                containerView.frame = newFrame
-                containerView.alpha = 0
-                containerView.layoutIfNeeded()
-            }) { (_) in
-                self.dockingViewState = .dismissed
-                containerView.removeFromSuperview()
-                self.viewDisAppeared(viewState: .dismissed)
-            }
-        } else if dockingViewState == .docked, swipeGesture.direction == .right {
-            var newFrame = containerView.frame
-            newFrame.origin.x = DeviceSpecific.width
-            self.viewGoingToDisAppear(viewState: .dismissed)
-            UIView.animate(withDuration: 0.5, animations: {
-                containerView.frame = newFrame
-                containerView.alpha = 0
-                containerView.layoutIfNeeded()
-            }) { (_) in
-                self.dockingViewState = .dismissed
-                containerView.removeFromSuperview()
-                self.viewDisAppeared(viewState: .dismissed)
-            }
         }
     }
 }
@@ -779,6 +804,20 @@ extension UIView {
         self.leadingAnchor.constraint(equalTo: superview.leadingAnchor, constant: 0).isActive = true
         self.trailingAnchor.constraint(equalTo: superview.trailingAnchor, constant: 0).isActive = true
     }
+    
+    func addFourConstraintsUsingNSLayoutConstraint(_ superview: UIView) -> (top: NSLayoutConstraint, bottom: NSLayoutConstraint, leading: NSLayoutConstraint, trailing: NSLayoutConstraint) {
+        self.translatesAutoresizingMaskIntoConstraints = false
+        let topCosntraint = NSLayoutConstraint(item: self, attribute: NSLayoutConstraint.Attribute.top, relatedBy: NSLayoutConstraint.Relation.equal, toItem: superview, attribute: NSLayoutConstraint.Attribute.top, multiplier: 1.0, constant: 0.0)
+        let bottomCosntraint = NSLayoutConstraint(item: self, attribute: NSLayoutConstraint.Attribute.bottom, relatedBy: NSLayoutConstraint.Relation.equal, toItem: superview, attribute: NSLayoutConstraint.Attribute.bottom, multiplier: 1.0, constant: 0.0)
+        let leadingCosntraint = NSLayoutConstraint(item: self, attribute: NSLayoutConstraint.Attribute.leading, relatedBy: NSLayoutConstraint.Relation.equal, toItem: superview, attribute: NSLayoutConstraint.Attribute.leading, multiplier: 1.0, constant: 0.0)
+        let trailingCosntraint = NSLayoutConstraint(item: self, attribute: NSLayoutConstraint.Attribute.trailing, relatedBy: NSLayoutConstraint.Relation.equal, toItem: superview, attribute: NSLayoutConstraint.Attribute.trailing, multiplier: 1.0, constant: 0.0)
+        topCosntraint.isActive = true
+        bottomCosntraint.isActive = true
+        leadingCosntraint.isActive = true
+        trailingCosntraint.isActive = true
+        let constraintTuple = (top: topCosntraint, bottom: bottomCosntraint, leading: leadingCosntraint, trailing: trailingCosntraint)
+        return constraintTuple
+    }
     //Ignoring the bottom
     func addThreeConstraints(_ superview: UIView) {
         self.translatesAutoresizingMaskIntoConstraints = false
@@ -793,5 +832,7 @@ extension UIView {
         self.leadingAnchor.constraint(equalTo: superview.leadingAnchor, constant: 0).isActive = true
         self.trailingAnchor.constraint(equalTo: superview.trailingAnchor, constant: 0).isActive = true
     }
+    
+    
     
 }

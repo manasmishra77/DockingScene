@@ -23,7 +23,7 @@ class ViewController: UIViewController {
     }
     
     @objc func clickedOnButton() {
-        dockingView = DockingViewSubClass(referenceView: self.view)
+        dockingView = DockingViewSubClass(referenceView: self.view, initialConstraints: DockingView.ConstraontsToDockingView(top: 0, bottom: 0, leading: 0, trailing: 0))
         dockingView?.addViewToTopView()
         dockingView?.addViewToCentralView()
         dockingView?.present()
