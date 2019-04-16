@@ -550,14 +550,16 @@ private extension DockingView {
             guard touchStartingPoint != nil else {return nil}
             guard isTransitionPannigStarted else {return nil}
             isTransitionPannigStarted = false
-            let endFrame = getFrameOfTheDockingView(touchingPoint: touchingPoint, viewState: self.dockingViewState)
-            var newFrame = endFrame
+            var newFrame = CGRect.zero
             if dockingViewState == .transitionLeftSide  || dockingViewState == .transitionRightSide {
+                let endFrame = getFrameOfDockingViewForLeftSwipeDismiss(touchingPoint: touchingPoint, viewState: dockingViewState)
+                newFrame = endFrame
                 newFrame = gettingFinalFrameInTouchEndForLeftSwipeToDismiss(endFrame, viewState: self.dockingViewState, endPoint: touchingPoint)
             } else {
+                let endFrame = getFrameOfTheDockingView(touchingPoint: touchingPoint, viewState: self.dockingViewState)
+                newFrame = endFrame
                 newFrame =  gettingFinalFrameForTouchEnd(endFrame, viewState: self.dockingViewState, endPoint: touchingPoint)
             }
-
             touchStartingPoint = nil
             touchStartingTime = nil
             return newFrame
@@ -709,6 +711,9 @@ private extension DockingView {
     func getFrameOfDockingViewForLeftSwipeDismiss(touchingPoint: CGPoint, viewState: DockingViewState) -> CGRect {
         if viewState == .transitionLeftSide {
             let dC = (touchStartingPoint?.x ?? 0) - touchingPoint.x
+            guard dC >= 0 else {
+                return getFrameOfDockingViewForLeftSwipeDismiss(touchingPoint: touchingPoint, viewState: .transitionRightSide)
+            }
             var scale = dC/panLengthForLeftSwipeDismiss
             if scale < 0 {
                 scale = 0
@@ -725,6 +730,9 @@ private extension DockingView {
             return newFrame
         } else if viewState == .transitionRightSide {
             let dC = touchingPoint.x - (touchStartingPoint?.x ?? 0)
+            guard dC >= 0 else {
+                return getFrameOfDockingViewForLeftSwipeDismiss(touchingPoint: touchingPoint, viewState: .transitionLeftSide)
+            }
             var scale = dC/panLengthForRightSwipeDismiss
             if scale < 0 {
                 scale = 0
